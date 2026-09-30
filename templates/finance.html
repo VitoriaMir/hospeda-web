@@ -1,0 +1,136 @@
+{% extends 'base.html' %}{% block title %}Financeiro • {{ brand.name }}{% endblock %}{% block page_title %}Financeiro{% endblock %}{% block content %}
+<div class="page-head">
+  <div><h1>Financeiro</h1><p>Recebimentos, despesas e pendências em um só lugar.</p></div>
+</div>
+
+<div class="operations-toolbar finance-toolbar">
+  <div class="tabs finance-tabs" role="tablist" aria-label="Financeiro">
+    <button class="tab-btn {{'active' if kind=='PAGAMENTOS'}}" data-tab="pagamentos" role="tab">💰 Recebimentos <span class="tab-count">{{ payment_total_count }}</span></button>
+    <button class="tab-btn {{'active' if kind=='DESPESAS'}}" data-tab="despesas" role="tab">🧾 Despesas <span class="tab-count">{{ expense_total_count }}</span></button>
+  </div>
+  <div class="operations-actions finance-actions">
+    {% if kind == 'PAGAMENTOS' %}
+    <button class="btn primary" onclick="newPaymentModal()">+ Novo pagamento</button>
+    {% else %}
+    <button class="btn primary" onclick="newExpenseModal()">+ Nova despesa</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="operation-summary">
+  <div class="summary-card success-card"><span>Total recebido</span><strong>R$ {{'%.2f'|format(total_p)|replace('.',',')}}</strong><small>pagamentos pagos</small></div>
+  <div class="summary-card warning-card"><span>A receber</span><strong>R$ {{'%.2f'|format(pending)|replace('.',',')}}</strong><small>pendentes + atrasados</small></div>
+  <div class="summary-card danger-card"><span>Despesas</span><strong>R$ {{'%.2f'|format(total_e)|replace('.',',')}}</strong><small>despesas lançadas</small></div>
+  <div class="summary-card info-card"><span>Atrasados</span><strong>{{overdue}}</strong><small>pagamentos em atraso</small></div>
+</div>
+
+<section id="tab-pagamentos" class="tab-panel" {% if kind!='PAGAMENTOS' %}hidden{% endif %}>
+  <form class="filters professional-filter finance-filter" method="get">
+    <input type="hidden" name="kind" value="PAGAMENTOS">
+    <input name="q" value="{{q if kind=='PAGAMENTOS' else ''}}" placeholder="🔎 Buscar descrição ou observação...">
+    <select name="status"><option value="">Todos os status</option>{% for s in ['PAGO','PENDENTE','ATRASADO','CANCELADO'] %}<option value="{{s}}" {{'selected' if status==s and kind=='PAGAMENTOS'}}>{{s}}</option>{% endfor %}</select>
+    <select name="period" id="periodType" data-no-autosubmit data-period-target="periodValue">{% for p,label in [('DIA','Dia'),('SEMANA','Semana'),('MES','Mês'),('ANO','Ano')] %}<option value="{{p}}" {{'selected' if period==p}}>{{label}}</option>{% endfor %}</select>
+    <input name="period_value" id="periodValue" value="{{period_value}}">
+    <button class="btn primary" type="submit">Filtrar</button><a class="btn" href="{{url_for('finance',kind='PAGAMENTOS')}}">Limpar filtros</a>
+  </form>
+  <div class="card table-card">
+    <div class="operation-head"><div><h3>Recebimentos</h3><p class="muted">{{pays|length}} lançamento(s) encontrados.</p></div></div>
+    <table><thead><tr><th>Hóspede</th><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+    {% for p in pays %}<tr><td>{% if p.guest_id %}<a class="name-link" href="{{url_for('guest_detail',gid=p.guest_id)}}">{{guests_map.get(p.guest_id,'—')}}</a>{% else %}—{% endif %}</td><td>{{p.description}}</td><td>{{p.due_date.strftime('%d/%m/%Y')}}</td><td><b>R$ {{'%.2f'|format(p.amount)|replace('.',',')}}</b></td><td><span class="badge {{p.status|lower}}">{{p.status}}</span></td><td><div class="operation-actions-cell">{% if p.status not in ('PAGO','CANCELADO') %}<form method="post" action="{{url_for('payment_status',pid=p.id,status='PAGO')}}"><button class="btn btn-sm success-btn">✓ Pagar</button></form>{% endif %}<button class="btn btn-sm" type="button" onclick="editPayment(this)" data-id="{{p.id}}" data-guest="{{p.guest_id or ''}}" data-guest-name="{{guests_map.get(p.guest_id,'')|e}}" data-room="{{p.room_id or ''}}" data-room-number="{{rooms_map.get(p.room_id,'')|e}}" data-description="{{p.description|e}}" data-amount="{{'%.2f'|format(p.amount)|replace('.',',')}}" data-due="{{p.due_date.strftime('%Y-%m-%dT%H:%M')}}" data-method="{{(p.method or '')|e}}" data-status="{{p.status}}" data-notes="{{(p.notes or '')|e}}">Editar</button>{% if p.status not in ('PAGO','CANCELADO') %}<form method="post" action="{{url_for('payment_status',pid=p.id,status='CANCELADO')}}" onsubmit="return confirm('Cancelar este pagamento?');"><button class="btn btn-sm danger-btn">Cancelar</button></form>{% endif %}</div></td></tr>{% else %}<tr><td colspan="6" class="empty">Nenhum recebimento encontrado com os filtros atuais.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+</section>
+
+<section id="tab-despesas" class="tab-panel" {% if kind!='DESPESAS' %}hidden{% endif %}>
+  <form class="filters professional-filter finance-filter" method="get">
+    <input type="hidden" name="kind" value="DESPESAS">
+    <input name="q" value="{{q if kind=='DESPESAS' else ''}}" placeholder="🔎 Buscar descrição, categoria ou observação...">
+    <select name="status"><option value="">Todos os status</option>{% for s in ['PAGO','PENDENTE','ATRASADO','CANCELADO'] %}<option value="{{s}}" {{'selected' if status==s and kind=='DESPESAS'}}>{{s}}</option>{% endfor %}</select>
+    <select name="period" id="periodTypeDespesas" data-no-autosubmit data-period-target="periodValueDespesas">{% for p,label in [('DIA','Dia'),('SEMANA','Semana'),('MES','Mês'),('ANO','Ano')] %}<option value="{{p}}" {{'selected' if period==p}}>{{label}}</option>{% endfor %}</select>
+    <input name="period_value" id="periodValueDespesas" value="{{period_value}}">
+    <button class="btn primary" type="submit">Filtrar</button><a class="btn" href="{{url_for('finance',kind='DESPESAS')}}">Limpar filtros</a>
+  </form>
+  <div class="card table-card">
+    <div class="operation-head"><div><h3>Despesas</h3><p class="muted">{{expenses|length}} lançamento(s) encontrados.</p></div></div>
+    <table><thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+    {% for e in expenses %}<tr><td>{{e.description}}</td><td>{{e.category}}</td><td>{{e.date.strftime('%d/%m/%Y')}}</td><td><b>R$ {{'%.2f'|format(e.amount)|replace('.',',')}}</b></td><td><span class="badge {{e.status|lower}}">{{e.status}}</span></td><td><div class="operation-actions-cell"><button class="btn btn-sm" type="button" onclick="editExpense(this)" data-id="{{e.id}}" data-description="{{e.description|e}}" data-category="{{e.category|e}}" data-amount="{{'%.2f'|format(e.amount)|replace('.',',')}}" data-date="{{e.date.strftime('%Y-%m-%dT%H:%M')}}" data-status="{{e.status}}" data-notes="{{(e.notes or '')|e}}">Editar</button>{% if e.status not in ('PAGO','CANCELADO') %}<form method="post" action="{{url_for('expense_status',eid=e.id,status='CANCELADO')}}" onsubmit="return confirm('Cancelar esta despesa?');"><button class="btn btn-sm danger-btn">Cancelar</button></form>{% endif %}</div></td></tr>{% else %}<tr><td colspan="6" class="empty">Nenhuma despesa encontrada com os filtros atuais.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+</section>
+
+<div class="modal" id="paymentModal"><div class="modal-box"><div class="modal-head"><div><h2 id="paymentModalTitle">Novo pagamento</h2><p id="paymentModalSubtitle">Registre um recebimento ou valor a receber.</p></div><button class="modal-close" onclick="closeModal('paymentModal')">×</button></div><form id="paymentForm" class="modal-form" method="post" action="{{url_for('new_payment')}}"><label>Descrição<input name="description" id="paymentDescription" required></label><div class="form-row"><label>Hóspede<select name="guest_id" id="paymentGuest"><option value="">Nenhuma</option>{% for g in guests %}<option value="{{g.id}}" data-room="{{g.room_id or ''}}" data-room-number="{{rooms_map.get(g.room_id,'')|e}}">{{g.full_name}}</option>{% endfor %}</select><input type="text" id="paymentGuestReadonly" class="field-readonly" readonly disabled style="display:none"></label><label>Quarto<select name="room_id" id="paymentRoom" style="display:none"><option value="">Nenhum</option>{% for r in rooms %}<option value="{{r.id}}">{{r.number}}</option>{% endfor %}</select><input type="text" id="paymentRoomReadonly" class="field-readonly" readonly disabled placeholder="Selecionado automaticamente pela hóspede"></label></div><div class="form-row"><label>Valor<input name="amount" id="paymentAmount" value="0,00" required></label><label>Vencimento<input type="datetime-local" name="due_date" id="paymentDue" required></label></div><div class="form-row"><label>Status<select name="status" id="paymentStatus"><option>PENDENTE</option><option>PAGO</option><option>ATRASADO</option><option>CANCELADO</option></select></label><label>Método<input name="method" id="paymentMethod" placeholder="PIX, dinheiro, cartão..."></label></div><label>Observações<textarea name="notes" id="paymentNotes" rows="3"></textarea></label><div class="modal-actions"><button type="button" class="btn" onclick="closeModal('paymentModal')">Cancelar</button><button class="btn primary" id="paymentSubmit">Salvar pagamento</button></div></form></div></div>
+<div class="modal" id="expenseModal"><div class="modal-box"><div class="modal-head"><div><h2 id="expenseModalTitle">Nova despesa</h2><p id="expenseModalSubtitle">Registre custos da hospedagem.</p></div><button class="modal-close" onclick="closeModal('expenseModal')">×</button></div><form id="expenseForm" class="modal-form" method="post" action="{{url_for('new_expense')}}"><label>Descrição<input name="description" id="expenseDescription" required></label><div class="form-row"><label>Categoria<input name="category" id="expenseCategory" placeholder="Manutenção, compras..." required></label><label>Valor<input name="amount" id="expenseAmount" value="0,00" required></label></div><div class="form-row"><label>Data<input type="datetime-local" name="date" id="expenseDate" required></label><label>Status<select name="status" id="expenseStatus"><option>PENDENTE</option><option>PAGO</option><option>ATRASADO</option><option>CANCELADO</option></select></label></div><label>Observações<textarea name="notes" id="expenseNotes" rows="3"></textarea></label><div class="modal-actions"><button type="button" class="btn" onclick="closeModal('expenseModal')">Cancelar</button><button class="btn primary" id="expenseSubmit">Salvar despesa</button></div></form></div></div>
+{% endblock %}{% block scripts %}<script>
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+function setPaymentGuestEditable(editable,guestName){
+  const guestSelect=document.getElementById('paymentGuest');
+  const guestWrap=guestSelect.closest('.searchable-select')||guestSelect;
+  const guestRO=document.getElementById('paymentGuestReadonly');
+  guestWrap.style.display=editable?'':'none';
+  guestRO.style.display=editable?'none':'block';
+  if(!editable) guestRO.value=guestName||'Sem hóspede vinculado';
+}
+function updatePaymentRoomDisplay(roomNumber){
+  document.getElementById('paymentRoomReadonly').value=roomNumber||'';
+}
+function newPaymentModal(){
+  const f=document.getElementById('paymentForm');
+  f.action='/finance/payment/new'; f.reset();
+  document.getElementById('paymentModalTitle').textContent='Novo pagamento';
+  document.getElementById('paymentModalSubtitle').textContent='Registre um recebimento ou valor a receber.';
+  document.getElementById('paymentSubmit').textContent='Salvar pagamento';
+  setPaymentGuestEditable(true);
+  updatePaymentRoomDisplay('');
+  openModal('paymentModal');
+}
+function editPayment(btn){
+  const f=document.getElementById('paymentForm');
+  f.action='/finance/payment/'+btn.dataset.id+'/edit';
+  document.getElementById('paymentModalTitle').textContent='Editar pagamento';
+  document.getElementById('paymentModalSubtitle').textContent='Atualize os dados do lançamento.';
+  document.getElementById('paymentSubmit').textContent='Salvar alterações';
+  document.getElementById('paymentGuest').value=btn.dataset.guest;
+  document.getElementById('paymentRoom').value=btn.dataset.room;
+  document.getElementById('paymentDescription').value=btn.dataset.description;
+  document.getElementById('paymentAmount').value=btn.dataset.amount;
+  document.getElementById('paymentDue').value=btn.dataset.due;
+  document.getElementById('paymentMethod').value=btn.dataset.method;
+  document.getElementById('paymentStatus').value=btn.dataset.status;
+  document.getElementById('paymentNotes').value=btn.dataset.notes;
+  setPaymentGuestEditable(false,btn.dataset.guestName);
+  updatePaymentRoomDisplay(btn.dataset.roomNumber||'Sem unidade vinculada');
+  openModal('paymentModal');
+}
+document.addEventListener('DOMContentLoaded',function(){
+  const guestSelect=document.getElementById('paymentGuest'), roomSelect=document.getElementById('paymentRoom');
+  guestSelect?.addEventListener('change',function(){
+    const opt=this.options[this.selectedIndex];
+    roomSelect.value=opt?.dataset.room||'';
+    updatePaymentRoomDisplay(opt?.dataset.roomNumber||'');
+  });
+});
+function newExpenseModal(){
+  const f=document.getElementById('expenseForm');
+  f.action='/finance/expense/new'; f.reset();
+  document.getElementById('expenseModalTitle').textContent='Nova despesa';
+  document.getElementById('expenseModalSubtitle').textContent='Registre custos da hospedagem.';
+  document.getElementById('expenseSubmit').textContent='Salvar despesa';
+  openModal('expenseModal');
+}
+function editExpense(btn){
+  const f=document.getElementById('expenseForm');
+  f.action='/finance/expense/'+btn.dataset.id+'/edit';
+  document.getElementById('expenseModalTitle').textContent='Editar despesa';
+  document.getElementById('expenseModalSubtitle').textContent='Atualize os dados da despesa.';
+  document.getElementById('expenseSubmit').textContent='Salvar alterações';
+  document.getElementById('expenseDescription').value=btn.dataset.description;
+  document.getElementById('expenseCategory').value=btn.dataset.category;
+  document.getElementById('expenseAmount').value=btn.dataset.amount;
+  document.getElementById('expenseDate').value=btn.dataset.date;
+  document.getElementById('expenseStatus').value=btn.dataset.status;
+  document.getElementById('expenseNotes').value=btn.dataset.notes;
+  openModal('expenseModal');
+}
+document.querySelectorAll('.finance-tabs .tab-btn').forEach(btn=>btn.addEventListener('click',()=>{const tab=btn.dataset.tab; window.location.href='{{url_for("finance")}}?kind='+(tab==='despesas'?'DESPESAS':'PAGAMENTOS')}));
+</script>{% endblock %}

@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}Operações • {{ brand.name }}{% endblock %}
+{% block page_title %}Operações{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Operações</h1><p>Gerencie separadamente as rotinas de limpeza e manutenção.</p></div></div>
+<div class="operations-toolbar">
+  <div class="tabs" role="tablist" aria-label="Operações">
+    <button class="tab-btn active" data-tab="limpeza" role="tab">🧹 Limpeza <span class="tab-count">{{ clean_total }}</span></button>
+    <button class="tab-btn" data-tab="manutencao" role="tab">🔧 Manutenção <span class="tab-count">{{ maint_total }}</span></button>
+  </div>
+  <div class="operations-actions">
+    <button class="btn primary action-clean" type="button" onclick="newCleaningModal()">+ Nova tarefa</button>
+    <button class="btn primary action-maint" type="button" onclick="openModal('maintenanceModal')">+ Novo chamado</button>
+  </div>
+</div>
+
+<section id="tab-limpeza" class="tab-panel active" role="tabpanel">
+  <div class="operation-summary">
+    <div class="summary-card"><span>Total</span><strong>{{ clean_summary.total }}</strong><small>tarefas encontradas</small></div>
+    <div class="summary-card warning-card"><span>Pendentes</span><strong>{{ clean_summary.pendente }}</strong><small>agendadas ou pendentes</small></div>
+    <div class="summary-card info-card"><span>Em andamento</span><strong>{{ clean_summary.andamento }}</strong><small>em execução</small></div>
+    <div class="summary-card success-card"><span>Concluídas</span><strong>{{ clean_summary.concluida }}</strong><small>finalizadas</small></div>
+  </div>
+  <div class="card operation-filter-card">
+    <form method="get" class="operation-filters" id="cleanFilterForm">
+      <input type="hidden" name="maint_status" value="{{ maint_status }}"><input type="hidden" name="maint_priority" value="{{ maint_priority }}"><input type="hidden" name="maint_room" value="{{ maint_room or '' }}"><input type="hidden" name="maint_responsible" value="{{ maint_responsible }}"><input type="hidden" name="maint_q" value="{{ maint_q }}">
+      <input type="text" name="clean_q" value="{{ clean_q }}" placeholder="🔎 Buscar área, unidade ou observação...">
+      <select name="clean_status"><option value="">Todos os status</option>{% for st in ['AGENDADA','PENDENTE','EM ANDAMENTO','CONCLUÍDA','CANCELADA'] %}<option value="{{ st }}" {% if clean_status==st %}selected{% endif %}>{{ st }}</option>{% endfor %}</select>
+      <select name="clean_responsible"><option value="">Todos os responsáveis</option>{% for person in clean_responsibles %}<option value="{{ person }}" {% if clean_responsible==person %}selected{% endif %}>{{ person }}</option>{% endfor %}</select>
+      <select name="clean_period" id="cleanPeriodType" data-no-autosubmit data-period-target="cleanPeriodValue">{% for p,label in [('DIA','Dia'),('SEMANA','Semana'),('MES','Mês'),('ANO','Ano')] %}<option value="{{ p }}" {% if clean_period==p %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <input name="clean_period_value" id="cleanPeriodValue" value="{{ clean_period_value }}">
+      <button class="btn primary" type="submit">Filtrar</button>
+      <a class="btn" href="{{ url_for('operations') }}#limpeza">Limpar filtros</a>
+    </form>
+  </div>
+  <div class="card table-card">
+    <div class="card-head operation-head"><div><h3>Controle de limpeza</h3><p class="muted">{{ clean_summary.total }} resultado(s) com os filtros atuais.</p></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Quarto</th><th>Área</th><th>Data</th><th>Responsável</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+      {% for c in clean %}
+      <tr><td><strong>Quarto {{ rooms.get(c.room_id,'?') }}</strong></td><td>{{ c.area }}</td><td>{{ c.date.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ c.responsible or '—' }}</td><td><span class="badge {{ 'success' if c.status in ['CONCLUÍDA','REALIZADA'] else 'danger' if c.status=='CANCELADA' else 'warning' if c.status in ['AGENDADA','PENDENTE'] else 'info' }}">{{ c.status }}</span></td>
+        <td class="operation-actions-cell"><button class="btn btn-sm" type="button" onclick="editCleaning(this)" data-id="{{ c.id }}" data-room="{{ c.room_id }}" data-room-number="{{ rooms.get(c.room_id,'') }}" data-area="{{ c.area|e }}" data-date="{{ c.date.strftime('%Y-%m-%dT%H:%M') }}" data-responsible="{{ (c.responsible or '')|e }}" data-status="{{ c.status|e }}" data-notes="{{ (c.notes or '')|e }}">Editar</button>{% if c.status not in ['CONCLUÍDA','REALIZADA','CANCELADA'] %}<form method="post" action="{{ url_for('cleaning_status', cid=c.id, status='CONCLUÍDA') }}" onsubmit="return confirm('Concluir esta tarefa de limpeza?');"><button class="btn btn-sm success-btn" type="submit">Concluir</button></form>{% endif %}<form method="post" action="{{ url_for('delete_cleaning', cid=c.id) }}" onsubmit="return confirm('Excluir esta tarefa de limpeza? Esta ação não pode ser desfeita.');"><button class="btn btn-sm danger-btn" type="submit">Excluir</button></form></td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="empty">Nenhuma tarefa de limpeza encontrada com os filtros atuais.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>
+
+<section id="tab-manutencao" class="tab-panel" role="tabpanel" hidden>
+  <div class="operation-summary">
+    <div class="summary-card"><span>Total</span><strong>{{ maint_summary.total }}</strong><small>chamados encontrados</small></div>
+    <div class="summary-card warning-card"><span>Pendentes</span><strong>{{ maint_summary.pendente }}</strong><small>abertos ou pendentes</small></div>
+    <div class="summary-card info-card"><span>Em andamento</span><strong>{{ maint_summary.andamento }}</strong><small>em execução</small></div>
+    <div class="summary-card success-card"><span>Concluídos</span><strong>{{ maint_summary.concluida }}</strong><small>finalizados</small></div>
+    <div class="summary-card danger-card"><span>Urgentes</span><strong>{{ maint_summary.urgente }}</strong><small>prioridade urgente</small></div>
+  </div>
+  <div class="card operation-filter-card">
+    <form method="get" class="operation-filters" id="maintFilterForm">
+      <input type="hidden" name="clean_status" value="{{ clean_status }}"><input type="hidden" name="clean_room" value="{{ clean_room or '' }}"><input type="hidden" name="clean_responsible" value="{{ clean_responsible }}"><input type="hidden" name="clean_q" value="{{ clean_q }}"><input type="hidden" name="clean_period" value="{{ clean_period }}"><input type="hidden" name="clean_period_value" value="{{ clean_period_value }}">
+      <input type="text" name="maint_q" value="{{ maint_q }}" placeholder="🔎 Buscar local, unidade, problema ou observação...">
+      <select name="maint_status"><option value="">Todos os status</option>{% for st in ['ABERTO','PENDENTE','EM ANDAMENTO','CONCLUÍDO','CANCELADO'] %}<option value="{{ st }}" {% if maint_status==st %}selected{% endif %}>{{ st }}</option>{% endfor %}</select>
+      <select name="maint_priority"><option value="">Todas as prioridades</option>{% for pr in ['BAIXA','MÉDIA','ALTA','URGENTE'] %}<option value="{{ pr }}" {% if maint_priority==pr %}selected{% endif %}>{{ pr }}</option>{% endfor %}</select>
+      <select name="maint_responsible"><option value="">Todos os responsáveis</option>{% for person in maint_responsibles %}<option value="{{ person }}" {% if maint_responsible==person %}selected{% endif %}>{{ person }}</option>{% endfor %}</select>
+      <button class="btn primary" type="submit">Filtrar</button>
+      <a class="btn" href="{{ url_for('operations') }}#manutencao">Limpar filtros</a>
+    </form>
+  </div>
+  <div class="card table-card">
+    <div class="card-head operation-head"><div><h3>Controle de manutenção</h3><p class="muted">{{ maint_summary.total }} resultado(s) com os filtros atuais.</p></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Local</th><th>Descrição</th><th>Prioridade</th><th>Responsável</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+      {% for m in maint %}
+      <tr><td><strong>{{ m.location }}</strong>{% if m.room_id %}<small class="table-sub">Quarto {{ rooms.get(m.room_id,'?') }}</small>{% endif %}</td><td class="description-cell">{{ m.description }}</td><td><span class="badge {{ 'danger' if m.priority in ['ALTA','URGENTE'] else 'warning' if m.priority=='MÉDIA' else 'info' }}">{{ m.priority }}</span></td><td>{{ m.responsible or '—' }}</td><td><span class="badge {{ 'success' if m.status in ['CONCLUÍDO','CONCLUÍDA','FECHADO'] else 'danger' if m.status in ['CANCELADO','CANCELADA'] else 'info' }}">{{ m.status }}</span></td>
+        <td class="operation-actions-cell"><button class="btn btn-sm" type="button" onclick="editMaintenance(this)" data-id="{{ m.id }}" data-location="{{ m.location|e }}" data-room="{{ m.room_id or '' }}" data-description="{{ m.description|e }}" data-date="{{ m.date.strftime('%Y-%m-%dT%H:%M') }}" data-priority="{{ m.priority|e }}" data-responsible="{{ (m.responsible or '')|e }}" data-status="{{ m.status|e }}" data-cost="{{ m.cost or 0 }}" data-notes="{{ (m.notes or '')|e }}">Editar</button>{% if m.status not in ['CONCLUÍDO','CONCLUÍDA','FECHADO','CANCELADO','CANCELADA'] %}<form method="post" action="{{ url_for('maintenance_status', mid=m.id, status='CONCLUÍDO') }}" onsubmit="return confirm('Concluir este chamado de manutenção?');"><button class="btn btn-sm success-btn" type="submit">Concluir</button></form>{% endif %}<form method="post" action="{{ url_for('delete_maintenance', mid=m.id) }}" onsubmit="return confirm('Excluir este chamado de manutenção? Esta ação não pode ser desfeita.');"><button class="btn btn-sm danger-btn" type="submit">Excluir</button></form></td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="empty">Nenhum chamado de manutenção encontrado com os filtros atuais.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>
+
+<!-- NOVA / EDIÇÃO: LIMPEZA -->
+<div class="modal" id="cleaningModal" aria-hidden="true"><div class="modal-box"><div class="modal-head"><div><h2 id="cleaningModalTitle">Nova tarefa de limpeza</h2><p id="cleaningModalSubtitle">Registre uma nova tarefa para a equipe.</p></div><button class="modal-close" type="button" onclick="closeModal('cleaningModal')">×</button></div>
+<form method="post" action="{{ url_for('new_cleaning') }}" class="modal-form" id="cleaningForm">
+<input type="hidden" name="id" id="cleaning_id">
+<label>Quarto<select name="room_id" id="cleaning_room" required><option value="">Selecione...</option>{% for id,number in rooms.items() %}<option value="{{ id }}">Quarto {{ number }}</option>{% endfor %}</select><input type="text" id="cleaning_room_readonly" class="field-readonly" readonly disabled style="display:none"></label>
+<label>Área<input name="area" id="cleaning_area" required placeholder="Ex.: Quarto, banheiro, cozinha..." /></label>
+<label>Data e hora<input type="datetime-local" name="date" id="cleaning_date" value="{{ now.strftime('%Y-%m-%dT%H:%M') }}" required /></label>
+<label>Responsável<input name="responsible" id="cleaning_responsible" placeholder="Nome do responsável" /></label>
+<label>Status<select name="status" id="cleaning_status"><option>AGENDADA</option><option>PENDENTE</option><option>EM ANDAMENTO</option><option>CONCLUÍDA</option><option>CANCELADA</option></select></label>
+<label>Observações<textarea name="notes" id="cleaning_notes" rows="3" placeholder="Observações opcionais"></textarea></label>
+<div class="modal-actions"><button type="button" class="btn" onclick="closeModal('cleaningModal')">Cancelar</button><button type="submit" class="btn primary" id="cleaningSubmit">Salvar tarefa</button></div>
+</form></div></div>
+
+<!-- NOVO / EDIÇÃO: MANUTENÇÃO -->
+<div class="modal" id="maintenanceModal" aria-hidden="true"><div class="modal-box"><div class="modal-head"><div><h2 id="maintenanceModalTitle">Novo chamado de manutenção</h2><p id="maintenanceModalSubtitle">Registre o problema para acompanhamento.</p></div><button class="modal-close" type="button" onclick="closeModal('maintenanceModal')">×</button></div>
+<form method="post" action="{{ url_for('new_maintenance') }}" class="modal-form" id="maintenanceForm">
+<input type="hidden" name="id" id="maintenance_id">
+<label>Local<input name="location" id="maintenance_location" required placeholder="Ex.: Quarto, lavanderia, cozinha..." /></label>
+<label>Quarto relacionado<select name="room_id" id="maintenance_room"><option value="">Não se aplica</option>{% for id,number in rooms.items() %}<option value="{{ id }}">Quarto {{ number }}</option>{% endfor %}</select></label>
+<label>Problema / descrição<textarea name="description" id="maintenance_description" rows="3" required placeholder="Descreva o problema"></textarea></label>
+<div class="form-row"><label>Data<input type="datetime-local" name="date" id="maintenance_date" value="{{ now.strftime('%Y-%m-%dT%H:%M') }}" required /></label><label>Prioridade<select name="priority" id="maintenance_priority"><option>BAIXA</option><option selected>MÉDIA</option><option>ALTA</option><option>URGENTE</option></select></label></div>
+<div class="form-row"><label>Responsável<input name="responsible" id="maintenance_responsible" placeholder="Nome do responsável" /></label><label>Status<select name="status" id="maintenance_status"><option>ABERTO</option><option>PENDENTE</option><option>EM ANDAMENTO</option><option>CONCLUÍDO</option><option>CANCELADO</option></select></label></div>
+<label>Custo estimado / realizado<input name="cost" id="maintenance_cost" type="number" min="0" step="0.01" value="0" /></label>
+<label>Observações<textarea name="notes" id="maintenance_notes" rows="3" placeholder="Observações opcionais"></textarea></label>
+<div class="modal-actions"><button type="button" class="btn" onclick="closeModal('maintenanceModal')">Cancelar</button><button type="submit" class="btn primary" id="maintenanceSubmit">Salvar chamado</button></div>
+</form></div></div>
+{% endblock %}
+{% block scripts %}<script>
+function openModal(id){const m=document.getElementById(id);m.classList.add('show');m.setAttribute('aria-hidden','false');}
+function closeModal(id){const m=document.getElementById(id);m.classList.remove('show');m.setAttribute('aria-hidden','true');}
+function setCleaningRoomEditable(editable,roomNumber){
+  const select=document.getElementById('cleaning_room');
+  const wrap=select.closest('.searchable-select')||select;
+  const ro=document.getElementById('cleaning_room_readonly');
+  wrap.style.display=editable?'':'none';
+  ro.style.display=editable?'none':'block';
+  if(!editable) ro.value=roomNumber?('Quarto '+roomNumber):'Sem unidade vinculada';
+}
+function newCleaningModal(){
+  const f=document.getElementById('cleaningForm');
+  f.action='{{ url_for("new_cleaning") }}'; f.reset();
+  document.getElementById('cleaningModalTitle').textContent='Nova tarefa de limpeza';
+  document.getElementById('cleaningModalSubtitle').textContent='Registre uma nova tarefa para a equipe.';
+  document.getElementById('cleaningSubmit').textContent='Salvar tarefa';
+  document.getElementById('cleaning_date').value='{{ now.strftime("%Y-%m-%dT%H:%M") }}';
+  setCleaningRoomEditable(true);
+  openModal('cleaningModal');
+}
+function editCleaning(btn){
+  const f=document.getElementById('cleaningForm');
+  f.action='/operations/cleaning/'+btn.dataset.id+'/edit';
+  document.getElementById('cleaningModalTitle').textContent='Editar tarefa de limpeza';
+  document.getElementById('cleaningModalSubtitle').textContent='Atualize os dados da tarefa.';
+  document.getElementById('cleaningSubmit').textContent='Salvar alterações';
+  document.getElementById('cleaning_id').value=btn.dataset.id;
+  document.getElementById('cleaning_room').value=btn.dataset.room;
+  document.getElementById('cleaning_area').value=btn.dataset.area;
+  document.getElementById('cleaning_date').value=btn.dataset.date;
+  document.getElementById('cleaning_responsible').value=btn.dataset.responsible;
+  document.getElementById('cleaning_status').value=btn.dataset.status;
+  document.getElementById('cleaning_notes').value=btn.dataset.notes;
+  setCleaningRoomEditable(false,btn.dataset.roomNumber);
+  openModal('cleaningModal');
+}
+function editMaintenance(btn){
+  const f=document.getElementById('maintenanceForm');
+  f.action='/operations/maintenance/'+btn.dataset.id+'/edit';
+  document.getElementById('maintenanceModalTitle').textContent='Editar chamado de manutenção';
+  document.getElementById('maintenanceModalSubtitle').textContent='Atualize os dados do chamado.';
+  document.getElementById('maintenanceSubmit').textContent='Salvar alterações';
+  document.getElementById('maintenance_id').value=btn.dataset.id;
+  document.getElementById('maintenance_location').value=btn.dataset.location;
+  document.getElementById('maintenance_room').value=btn.dataset.room;
+  document.getElementById('maintenance_description').value=btn.dataset.description;
+  document.getElementById('maintenance_date').value=btn.dataset.date;
+  document.getElementById('maintenance_priority').value=btn.dataset.priority;
+  document.getElementById('maintenance_responsible').value=btn.dataset.responsible;
+  document.getElementById('maintenance_status').value=btn.dataset.status;
+  document.getElementById('maintenance_cost').value=btn.dataset.cost;
+  document.getElementById('maintenance_notes').value=btn.dataset.notes;
+  openModal('maintenanceModal');
+}
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id)}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(m=>closeModal(m.id));});
+function activateOperationsTab(target){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===target));
+  document.querySelectorAll('.tab-panel').forEach(panel=>{const active=panel.id==='tab-'+target;panel.classList.toggle('active',active);panel.hidden=!active;});
+}
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+  activateOperationsTab(btn.dataset.tab);
+  history.replaceState(null,'','#'+btn.dataset.tab);
+}));
+function syncOperationsTabFromHash(){
+  activateOperationsTab(location.hash==='#manutencao'?'manutencao':'limpeza');
+}
+window.addEventListener('hashchange',syncOperationsTabFromHash);
+syncOperationsTabFromHash();
+</script>{% endblock %}

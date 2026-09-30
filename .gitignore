@@ -1,0 +1,16 @@
+# Ambiente virtual Python
+.venv/
+__pycache__/
+*.pyc
+.secret_key
+conpec.db
+
+# Configuração local do Claude Code (não é parte do projeto)
+.claude/
+
+# Logo/marca do cliente (fica só na instalação local)
+static/img/brand/
+brand.local.json
+
+# Build da demo estática
+_site/

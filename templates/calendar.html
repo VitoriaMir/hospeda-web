@@ -1,0 +1,299 @@
+{% extends 'base.html' %}
+{% block title %}Calendário • {{ brand.name }}{% endblock %}
+{% block page_title %}Calendário de reservas{% endblock %}
+{% block head %}
+<style>
+  .calendar-card { padding: 16px; }
+  #calendar { min-height: 520px; }
+
+  .calendar-legend {
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .calendar-legend span {
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .calendar-legend i {
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    display:inline-block;
+  }
+  .legend-checkin { background:var(--accent); }
+  .legend-checkout { background:var(--amber); }
+  .legend-reserva { background:var(--slate); }
+  .legend-hospedada { background:var(--sage); }
+  .calendar-legend-note {
+    flex-basis:100%;
+    margin-top:0;
+    font-size:11px !important;
+    color:var(--ink-faint) !important;
+  }
+
+  .fc {
+    font-size:12px;
+    --fc-border-color:var(--line);
+    --fc-page-bg-color:var(--surface);
+    --fc-neutral-bg-color:var(--line-soft);
+    --fc-today-bg-color:var(--amber-soft);
+  }
+  .fc .fc-toolbar {
+    gap:10px;
+    margin-bottom:12px !important;
+  }
+  .fc .fc-toolbar-title {
+    font-size:20px;
+    color:var(--ink);
+    font-weight:800;
+  }
+  .fc .fc-button {
+    background:var(--accent);
+    border-color:var(--accent);
+    border-radius:8px;
+    box-shadow:none;
+    font-size:12px;
+    font-weight:700;
+  }
+  .fc .fc-button:hover,
+  .fc .fc-button-primary:not(:disabled).fc-button-active {
+    background:var(--accent-deep);
+    border-color:var(--accent-deep);
+  }
+  .fc .fc-daygrid-day-number {
+    color:var(--ink-soft);
+    font-weight:700;
+    padding:8px 9px;
+  }
+  .fc .fc-col-header-cell-cushion {
+    color:var(--ink-faint);
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.35px;
+    padding:8px 4px;
+  }
+  .fc .fc-daygrid-day-frame {
+    min-height:108px;
+  }
+  .fc .fc-daygrid-day-events {
+    margin-top:3px;
+    margin-bottom:3px;
+  }
+  .fc .fc-daygrid-event-harness {
+    margin:0 7px 5px;
+  }
+
+  /* Mês: eventos compactos, como marcadores, sem barras largas. */
+  .fc .fc-daygrid-event {
+    border:0 !important;
+    background:transparent !important;
+    padding:0 !important;
+    margin-top:0;
+    cursor:pointer;
+  }
+  .fc .fc-daygrid-event .fc-event-main {
+    color:var(--ink) !important;
+    padding:0;
+    overflow:hidden;
+  }
+  .compact-calendar-event {
+    display:flex;
+    align-items:center;
+    gap:7px;
+    min-width:0;
+    line-height:1.35;
+    font-size:11px;
+    font-weight:600;
+  }
+  .compact-calendar-event .event-dot {
+    width:8px;
+    height:8px;
+    min-width:8px;
+    border-radius:50%;
+  }
+  .compact-calendar-event .event-label {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .event-checkin-marker .event-dot { background:var(--accent); }
+  .event-checkout-marker .event-dot { background:var(--amber); }
+  .event-reserva .event-dot { background:var(--slate); }
+  .event-hospedada .event-dot { background:var(--sage); }
+
+  /* Semana/dia/lista continuam com uma leitura completa. */
+  .fc .fc-timegrid-event,
+  .fc .fc-list-event {
+    border-radius:6px;
+  }
+  .fc .fc-list-event .fc-list-event-title {
+    font-weight:600;
+  }
+  .calendar-help {
+    margin-top:14px;
+    font-size:12px;
+    color:var(--ink-faint);
+  }
+  @media(max-width:760px) {
+    .fc .fc-toolbar {
+      flex-wrap:wrap;
+    }
+    .fc .fc-toolbar-title {
+      font-size:16px;
+    }
+    .fc .fc-daygrid-day-frame {
+      min-height:84px;
+    }
+    .fc .fc-daygrid-event-harness {
+      margin-left:3px;
+      margin-right:3px;
+    }
+    .compact-calendar-event {
+      gap:4px;
+      font-size:10px;
+    }
+    .compact-calendar-event .event-dot {
+      width:6px;
+      min-width:6px;
+      height:6px;
+    }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Calendário</h1><p>Visualize reservas e hospedagens por mês, semana ou dia.</p></div></div>
+<div class="card calendar-card">
+  <div class="calendar-legend">
+    <span><i class="legend-checkin"></i> Check-in</span>
+    <span><i class="legend-checkout"></i> Check-out</span>
+    <span><i class="legend-reserva"></i> Reserva</span>
+    <span><i class="legend-hospedada"></i> Hospedagem ativa</span>
+    <span class="calendar-legend-note">Reservas mostram entrada e saída. Hospedagens de longa duração mostram apenas o check-in quando não existe data prevista de saída.</span>
+  </div>
+  <div id="calendar"></div>
+  <div class="calendar-help">Dica: arraste o marcador de check-in para remarcar o período completo. O check-out acompanha a mesma duração, e o sistema valida conflitos antes de salvar.</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+    locale: 'pt-br',
+    timeZone: 'local',
+    initialView: 'dayGridMonth',
+    height: 'auto',
+    editable: true,
+    eventDurationEditable: false,
+    eventStartEditable: true,
+    dayMaxEvents: 4,
+    eventDisplay: 'block',
+    allDaySlot: false,
+    slotMinTime: '06:00:00',
+    slotMaxTime: '24:00:00',
+    nowIndicator: true,
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+    },
+    buttonText: {
+      today: 'Hoje',
+      month: 'Mês',
+      week: 'Semana',
+      day: 'Dia',
+      list: 'Lista'
+    },
+    events: {{ events|tojson }},
+
+    eventContent(info) {
+      const event = info.event;
+      const props = event.extendedProps || {};
+      const isMonth = info.view.type === 'dayGridMonth';
+
+      if (!isMonth) {
+        const time = event.start ? event.start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+        return { html: `<span><b>${time}</b> ${escapeHtml(event.title)}</span>` };
+      }
+
+      const marker = props.marker === 'checkout' ? '↘' : '↗';
+      const label = props.guest
+        ? `${marker} ${props.guest} • ${props.room || ''}`
+        : event.title;
+
+      return {
+        html: `
+          <div class="compact-calendar-event" title="${escapeHtml(label)}">
+            <span class="event-dot" aria-hidden="true"></span>
+            <span class="event-label">${escapeHtml(label)}</span>
+          </div>
+        `
+      };
+    },
+
+    eventDidMount(info) {
+      const p = info.event.extendedProps || {};
+      info.el.title = `${p.guest || info.event.title} | Unidade: ${p.room || '—'} | Check-in: ${p.checkIn || '—'} | Check-out: ${p.checkOut || '—'}`;
+    },
+
+    eventClick(info) {
+      const p = info.event.extendedProps || {};
+      alert(`${p.guest || info.event.title}\nUnidade: ${p.room || '—'}\nCheck-in: ${p.checkIn || '—'}\nCheck-out: ${p.checkOut || '—'}\nStatus: ${p.status || '—'}`);
+    },
+
+    eventDrop(info) {
+      const event = info.event;
+      const p = event.extendedProps || {};
+      if (p.marker !== 'checkin') {
+        info.revert();
+        return;
+      }
+
+      const originalStart = new Date(p.originalCheckIn);
+      const originalEnd = p.originalCheckOut ? new Date(p.originalCheckOut) : null;
+      const movedStart = new Date(event.start);
+      const delta = movedStart.getTime() -
+        new Date(originalStart.getFullYear(), originalStart.getMonth(), originalStart.getDate()).getTime();
+      const newStart = new Date(originalStart.getTime() + delta);
+      const newEnd = originalEnd ? new Date(originalEnd.getTime() + delta) : null;
+
+      fetch('{{ url_for("move_calendar_event") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          id: event.id,
+          start: newStart.toISOString(),
+          end: newEnd ? newEnd.toISOString() : null
+        })
+      })
+      .then(r => r.json().then(data => ({ok: r.ok, data})))
+      .then(result => {
+        if (!result.ok || !result.data.ok) {
+          info.revert();
+          alert(result.data.message || 'Não foi possível mover o evento.');
+          return;
+        }
+        window.location.reload();
+      })
+      .catch(() => {
+        info.revert();
+        alert('Erro de comunicação com o servidor.');
+      });
+    }
+  });
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    }[char]));
+  }
+
+  calendar.render();
+});
+</script>
+{% endblock %}

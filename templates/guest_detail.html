@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Perfil • {{g.full_name}}{% endblock %}
+{% block page_title %}Perfil da hóspede{% endblock %}
+{% block content %}
+<a href="{{url_for('guests')}}" class="back">← Voltar para hóspedes</a>
+
+<div class="profile-head card profile-hero">
+  <div class="profile-avatar">{{g.full_name[0]|upper}}</div>
+  <div class="profile-identity">
+    <div class="profile-kicker">Cadastro da hóspede #{{g.id}}</div>
+    <h1>{{g.full_name}}</h1>
+    <p>{{g.email or 'E-mail não informado'}} <span>•</span> {{g.phone or 'Telefone não informado'}}</p>
+    <div class="profile-tags"><span class="badge success">Cadastro ativo</span>{% if g.room_id %}<span class="badge info">Unidade vinculada</span>{% else %}<span class="badge">Sem unidade vinculada</span>{% endif %}</div>
+  </div>
+  <div class="quick profile-actions"><button class="btn primary" onclick="openModal('editGuestModal')">✎ Editar cadastro</button></div>
+</div>
+
+<nav class="profile-tabs" aria-label="Seções do perfil">
+  <button type="button" class="profile-tab active" data-tab="overview" onclick="showProfileTab('overview')">Visão geral</button>
+  <button type="button" class="profile-tab" data-tab="stays" onclick="showProfileTab('stays')">Hospedagens</button>
+  <button type="button" class="profile-tab" data-tab="finance" onclick="showProfileTab('finance')">Financeiro</button>
+  <button type="button" class="profile-tab" data-tab="documents" onclick="showProfileTab('documents')">Documentos</button>
+</nav>
+
+<div class="profile-tab-panel active" data-panel="overview">
+<div class="profile-metrics">
+  <div class="summary-card"><span>Hospedagens</span><strong>{{stays|length}}</strong><small>registros no histórico</small></div>
+  <div class="summary-card info-card"><span>Reservas</span><strong>{{bookings|length}}</strong><small>reservas cadastradas</small></div>
+  <div class="summary-card success-card"><span>Pagamentos</span><strong>{{pays|length}}</strong><small>lançamentos financeiros</small></div>
+  <div class="summary-card warning-card"><span>Unidade atual</span><strong>{{rooms.get(current_room_id,'—') if current_room_id else '—'}}</strong><small>vínculo cadastrado</small></div>
+</div>
+
+<div class="grid-2 profile-top-grid">
+  <div class="card profile-section"><div class="section-heading"><h3>Dados pessoais</h3><span>Identificação</span></div><div class="detail-grid">
+    <div><small>CPF</small><b>{{g.cpf or '—'}}</b></div><div><small>RG</small><b>{{g.rg or '—'}}</b></div>
+    <div><small>Data de nascimento</small><b>{{g.birth_date.strftime('%d/%m/%Y') if g.birth_date else '—'}}</b></div><div><small>Idade</small><b>{% if g.birth_date %}{{((now.date() - g.birth_date).days // 365)}} anos{% else %}—{% endif %}</b></div>
+  </div></div>
+  <div class="card profile-section"><div class="section-heading"><h3>Contato</h3><span>Comunicação</span></div><div class="detail-grid">
+    <div><small>Telefone</small><b>{{g.phone or '—'}}</b></div><div><small>WhatsApp</small><b>{{g.whatsapp or '—'}}</b></div>
+    <div class="detail-wide"><small>E-mail</small><b>{{g.email or '—'}}</b></div>
+  </div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card profile-section"><div class="section-heading"><h3>Endereço</h3><span>Residência</span></div><div class="detail-grid"><div class="detail-wide"><small>Endereço</small><b>{{g.address or '—'}}</b></div><div><small>Cidade</small><b>{{g.city or '—'}}</b></div><div><small>UF</small><b>{{g.state or '—'}}</b></div></div></div>
+  <div class="card profile-section"><div class="section-heading"><h3>Contato de emergência</h3><span>Segurança</span></div><p class="profile-text">{{g.emergency_contact or 'Nenhum contato de emergência informado.'}}</p></div>
+</div>
+
+<div class="card profile-section"><div class="section-heading"><h3>Observações</h3><span>Informações adicionais</span></div><p class="profile-text">{{g.notes or 'Nenhuma observação registrada.'}}</p></div>
+</div>
+
+<div class="profile-tab-panel" data-panel="stays">
+  <div class="card profile-section"><div class="section-heading"><h3>Histórico de hospedagens e reservas</h3><span>{{history|length}} registro(s)</span></div>{% for h in history %}<div class="list-item"><div><b>{{h.kind}} • Unidade {{rooms.get(h.room_id,'?')}}</b><small>{{h.start.strftime('%d/%m/%Y %H:%M')}} → {{h.end.strftime('%d/%m/%Y %H:%M') if h.end else 'Sem previsão'}} • R$ {{'%.2f'|format(h.value)|replace('.',',')}}</small></div><span class="badge {{'success' if h.status in ('ATIVA','CONFIRMADA') else 'danger' if h.status=='CANCELADA' else ''}}">{{h.status}}</span></div>{% else %}<div class="empty">Sem hospedagens ou reservas cadastradas.</div>{% endfor %}</div>
+</div>
+
+<div class="profile-tab-panel" data-panel="finance">
+  <div class="card profile-section"><div class="section-heading"><h3>Financeiro</h3><span>{{pays|length}} lançamento(s)</span></div>{% for p in pays %}<div class="list-item"><div><b>{{p.description}}</b><small>Vencimento {{p.due_date.strftime('%d/%m/%Y')}}</small></div><div class="profile-finance"><strong>R$ {{'%.2f'|format(p.amount)|replace('.',',')}}</strong><span class="badge">{{p.status}}</span></div></div>{% else %}<div class="empty">Sem lançamentos financeiros.</div>{% endfor %}</div>
+</div>
+
+<div class="profile-tab-panel" data-panel="documents">
+  <div class="card profile-section"><div class="section-heading"><h3>Documentos</h3><span>Cadastro da hóspede</span></div><div class="document-empty"><div class="document-icon">▤</div><h3>Nenhum documento anexado</h3><p>Em uma próxima etapa, será possível anexar documentos da hóspede, como identidade, contrato e comprovantes.</p><span class="badge">Em breve</span></div></div>
+</div>
+
+<div class="modal" id="editGuestModal"><div class="modal-box modal-box-lg"><div class="modal-head"><div><h2>Editar hóspede</h2><p>Atualize os dados cadastrais.</p></div><button class="modal-close" type="button" onclick="closeModal('editGuestModal')">×</button></div><form class="modal-form" method="post" action="{{url_for('edit_guest',gid=g.id)}}"><div class="form-section-title">Dados pessoais</div><label>Nome completo *<input name="full_name" value="{{g.full_name}}" autocomplete="name" required></label><div class="form-row"><label>CPF *<input name="cpf" value="{{g.cpf or ''}}" required></label><label>RG<input name="rg" value="{{g.rg or ''}}" placeholder="Documento de identidade"></label></div><div class="form-row"><label>Data de nascimento *<input type="date" name="birth_date" value="{{g.birth_date.isoformat() if g.birth_date else ''}}" required></label><label>E-mail<input type="email" name="email" value="{{g.email or ''}}" autocomplete="email" placeholder="nome@email.com"></label></div><div class="form-section-title">Contato e endereço</div><div class="form-row"><label>Telefone<input name="phone" value="{{g.phone or ''}}" placeholder="(00) 00000-0000"></label><label>WhatsApp *<input name="whatsapp" value="{{g.whatsapp or ''}}" placeholder="(00) 00000-0000" required></label></div><div class="form-row"><label>Cidade *<input name="city" value="{{g.city or ''}}" required></label><label>UF *<input name="state" maxlength="2" value="{{g.state or ''}}" placeholder="DF" required></label></div><label>Endereço *<input name="address" value="{{g.address or ''}}" autocomplete="street-address" required></label><label>Contato de emergência *<input name="emergency_contact" value="{{g.emergency_contact or ''}}" required></label><div class="form-section-title">Vínculo com a unidade</div><label>Unidade (opcional)<select name="room_id" id="editGuestRoomSelect"><option value="">Selecione...</option>{% for room in rooms_list %}<option value="{{room.id}}" {{'selected' if g.room_id == room.id}}>{{room.number}}</option>{% endfor %}</select><small class="field-help">Pesquise pelo número do quarto ou unidade. A unidade atual também aparece para edição.</small></label><label>Observações<textarea name="notes" rows="3" placeholder="Informações adicionais (opcional)">{{g.notes or ''}}</textarea></label><div class="modal-actions"><button type="button" class="btn" onclick="closeModal('editGuestModal')">Cancelar</button><button class="btn primary">Salvar alterações</button></div></form></div></div>
+{% endblock %}
+{% block scripts %}<script>
+function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('show')}
+function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('show')}
+function showProfileTab(tab){document.querySelectorAll('.profile-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.tab===tab));document.querySelectorAll('.profile-tab-panel').forEach(panel=>panel.classList.toggle('active',panel.dataset.panel===tab));}
+if(location.hash==='#editar-cadastro'){openModal('editGuestModal');}
+</script>{% endblock %}

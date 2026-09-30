@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Hóspedes • {{ brand.name }}{% endblock %}
+{% block page_title %}Hóspedes{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Hóspedes</h1><p>Cadastro, pesquisa e histórico das residentes.</p></div><button class="btn primary" type="button" onclick="openModal('guestModal')">+ Nova hóspede</button></div>
+<div class="operation-summary">
+  <div class="summary-card"><span>Total cadastradas</span><strong>{{guests|length}}</strong><small>resultado atual</small></div>
+  <div class="summary-card info-card"><span>Com telefone</span><strong>{{guests|selectattr('phone')|list|length}}</strong><small>contato informado</small></div>
+  <div class="summary-card success-card"><span>Com WhatsApp</span><strong>{{guests|selectattr('whatsapp')|list|length}}</strong><small>contato rápido</small></div>
+  <div class="summary-card warning-card"><span>Cidades</span><strong>{{cities|length}}</strong><small>localidades cadastradas</small></div>
+</div>
+<form class="filters professional-filter" method="get">
+  <input name="q" value="{{q}}" placeholder="🔎 Buscar nome, CPF, telefone ou WhatsApp..." aria-label="Buscar hóspede">
+  <select name="city"><option value="">Todas as cidades</option>{% for c in cities %}<option value="{{c}}" {{'selected' if city==c}}>{{c}}</option>{% endfor %}</select>
+  <button class="btn primary" type="submit">Filtrar</button><a class="btn" href="{{url_for('guests')}}">Limpar filtros</a>
+</form>
+<div class="card table-card"><div class="operation-head"><div><h3>Lista de hóspedes</h3><p class="muted">{{guests|length}} registro(s) encontrados.</p></div></div>
+<table><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>WhatsApp</th><th>Cidade/UF</th><th>Unidade</th><th>Ações</th></tr></thead>
+<tbody>{% for g in guests %}<tr><td><a class="name-link" href="{{url_for('guest_detail',gid=g.id)}}">{{g.full_name}}</a></td><td>{{g.cpf or '—'}}</td><td>{{g.phone or '—'}}</td><td>{{g.whatsapp or '—'}}</td><td>{{g.city or '—'}}{% if g.state %}/{{g.state}}{% endif %}</td><td>{{rooms_map.get(g.room_id, '—') if g.room_id else '—'}}</td><td><div class="operation-actions-cell"><a class="btn btn-sm" href="{{url_for('guest_detail',gid=g.id)}}">Ver perfil</a><a class="btn btn-sm" href="{{url_for('guest_detail',gid=g.id)}}#editar-cadastro">Editar</a></div></td></tr>{% else %}<tr><td colspan="7" class="empty">Nenhuma hóspede encontrada com os filtros atuais.</td></tr>{% endfor %}</tbody></table></div>
+<div class="modal" id="guestModal" role="dialog" aria-modal="true" aria-labelledby="guestModalTitle">
+  <div class="modal-box modal-box-lg">
+    <div class="modal-head"><div><h2 id="guestModalTitle">Nova hóspede</h2><p>Preencha os dados para criar um cadastro completo.</p></div><button class="modal-close" type="button" onclick="closeModal('guestModal')" aria-label="Fechar">×</button></div>
+    <form id="newGuestForm" class="modal-form" method="post" action="{{url_for('new_guest')}}">
+      <div class="form-section-title">Dados pessoais</div>
+      <label>Nome completo *<input name="full_name" autocomplete="name" placeholder="Nome completo" required></label>
+      <div class="form-row"><label>CPF *<input name="cpf" id="guestCpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required></label><label>RG<input name="rg" placeholder="Documento de identidade"></label></div>
+      <div class="form-row"><label>Data de nascimento *<input type="date" name="birth_date" id="guestBirth" required></label><label>E-mail<input type="email" name="email" autocomplete="email" placeholder="nome@email.com"></label></div>
+      <div class="form-section-title">Contato e endereço</div>
+      <div class="form-row"><label>Telefone<input name="phone" id="guestPhone" inputmode="tel" placeholder="(00) 00000-0000"></label><label>WhatsApp *<input name="whatsapp" id="guestWhatsapp" inputmode="tel" placeholder="(00) 00000-0000" required></label></div>
+      <div class="form-row"><label>Cidade *<input name="city" placeholder="Cidade" required></label><label>UF *<input name="state" id="guestState" maxlength="2" placeholder="DF" required></label></div>
+      <label>Endereço *<input name="address" autocomplete="street-address" placeholder="Rua, número, complemento" required></label>
+      <label>Contato de emergência *<input name="emergency_contact" placeholder="Nome e telefone" required></label>
+      <div class="form-section-title">Vínculo com a unidade</div>
+      <label>Unidade (opcional)
+        <select name="room_id" id="newGuestRoomSelect">
+          <option value="">Selecione...</option>
+          {% for room in rooms %}<option value="{{room.id}}">{{room.number}}</option>{% endfor %}
+        </select>
+        <small class="field-help">Pesquise pelo número do quarto ou unidade. Somente unidades ativas e disponíveis serão aceitas.</small>
+      </label>
+      <label>Observações<textarea name="notes" rows="3" placeholder="Informações adicionais (opcional)"></textarea></label>
+      <div class="modal-actions"><button type="button" class="btn" onclick="closeModal('guestModal')">Cancelar</button><button class="btn primary" type="submit">Salvar hóspede</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openModal(id){const el=document.getElementById(id);if(el){el.classList.add('show');const first=el.querySelector('input,select,textarea');if(first)setTimeout(()=>first.focus(),50);}}
+function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));});
+document.addEventListener('DOMContentLoaded',function(){
+  const form=document.getElementById('newGuestForm');
+  const cpf=document.getElementById('guestCpf'), state=document.getElementById('guestState');
+  const phoneFields=[document.getElementById('guestPhone'),document.getElementById('guestWhatsapp')];
+  const digits=v=>(v||'').replace(/\D/g,'');
+  const phoneMask=v=>{let d=digits(v).slice(0,11);if(d.length<=10)return d.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3').replace(/-$/,'');return d.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3').replace(/-$/,'');};
+  cpf?.addEventListener('input',()=>{let d=digits(cpf.value).slice(0,11);cpf.value=d.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4').replace(/[-.]$/,'');});
+  phoneFields.forEach(f=>f?.addEventListener('input',()=>f.value=phoneMask(f.value)));
+  state?.addEventListener('input',()=>state.value=state.value.replace(/[^a-z]/gi,'').toUpperCase().slice(0,2));
+  const birth=document.getElementById('guestBirth'); if(birth){const today=new Date();birth.max=today.toISOString().slice(0,10);}
+  if(form)form.addEventListener('submit',e=>{if(digits(cpf.value).length!==11){e.preventDefault();alert('Informe um CPF válido com 11 números.');cpf.focus();}});
+});
+</script>
+{% endblock %}

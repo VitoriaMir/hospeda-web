@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}Funcionários • {{ brand.name }}{% endblock %}
+{% block page_title %}Funcionários{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Funcionários</h1><p>Equipe da hospedagem e contas de acesso ao sistema.</p></div>
+  <div class="quick"><button class="btn primary" type="button" onclick="newEmployeeModal()">+ Novo funcionário</button></div>
+</div>
+<div class="operation-summary">
+  <div class="summary-card"><span>Total</span><strong>{{summary.total}}</strong><small>funcionários cadastrados</small></div>
+  <div class="summary-card success-card"><span>Ativos</span><strong>{{summary.ativos}}</strong><small>em atividade</small></div>
+  <div class="summary-card info-card"><span>Com acesso</span><strong>{{summary.com_acesso}}</strong><small>contas de login</small></div>
+  <div class="summary-card danger-card"><span>Inativos</span><strong>{{summary.inativos}}</strong><small>sem atividade</small></div>
+</div>
+<form class="filters professional-filter" method="get">
+  <input name="q" value="{{q}}" placeholder="🔎 Buscar nome, função ou contato...">
+  <select name="function"><option value="">Todas as funções</option>{% for f in functions %}<option value="{{f}}" {{'selected' if function==f}}>{{f}}</option>{% endfor %}</select>
+  <select name="status"><option value="">Todos os status</option><option value="ATIVO" {{'selected' if status=='ATIVO'}}>Ativo</option><option value="INATIVO" {{'selected' if status=='INATIVO'}}>Inativo</option></select>
+  <button class="btn primary" type="submit">Filtrar</button><a class="btn" href="{{url_for('employees_page')}}">Limpar filtros</a>
+</form>
+<div class="card table-card">
+  <div class="operation-head"><div><h3>Lista de funcionários</h3><p class="muted">{{employees|length}} registro(s) encontrados.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Contato</th><th>Acesso ao sistema</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+  {% for e in employees %}
+  {% set u = user_map.get(e.user_id) %}
+  <tr>
+    <td><b>{{e.full_name}}</b></td>
+    <td>{{e.function}}</td>
+    <td>{{e.whatsapp or e.phone or '—'}}</td>
+    <td>{% if u %}<b>{{u.username}}</b><span class="table-sub">{{u.role.title()}} • {{'Acesso ativo' if u.active else 'Acesso desativado'}}</span>{% else %}<span class="table-sub">Sem acesso</span>{% endif %}</td>
+    <td><span class="badge {{'success' if e.active else 'danger'}}">{{'ATIVO' if e.active else 'INATIVO'}}</span></td>
+    <td><div class="operation-actions-cell">
+      <button class="btn btn-sm" type="button" onclick="editEmployee(this)" data-id="{{e.id}}" data-name="{{e.full_name|e}}" data-function="{{e.function|e}}" data-birth-date="{{e.birth_date.isoformat() if e.birth_date else ''}}" data-address="{{(e.address or '')|e}}" data-salary="{{'%.2f'|format(e.salary)|replace('.',',')}}" data-phone="{{(e.phone or '')|e}}" data-whatsapp="{{(e.whatsapp or '')|e}}" data-notes="{{(e.notes or '')|e}}" data-active="{{'1' if e.active else '0'}}">Editar</button>
+      {% if u %}
+        <form method="post" action="{{url_for('toggle_employee_access',eid=e.id)}}" onsubmit="return confirm('{{'Desativar' if u.active else 'Ativar'}} o acesso deste funcionário?');"><button class="btn btn-sm {{'danger-btn' if u.active else 'success-btn'}}" type="submit">{{'Desativar acesso' if u.active else 'Ativar acesso'}}</button></form>
+        <form method="post" action="{{url_for('reset_employee_password',eid=e.id)}}" onsubmit="return confirm('Redefinir a senha deste funcionário? Uma senha temporária será gerada.');"><button class="btn btn-sm" type="submit">Redefinir senha</button></form>
+      {% else %}
+        <button class="btn btn-sm success-btn" type="button" onclick="openAccessModal({{e.id}})">Criar acesso</button>
+      {% endif %}
+    </div></td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="empty">Nenhum funcionário encontrado com os filtros atuais.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="modal" id="employeeModal" role="dialog" aria-modal="true" aria-labelledby="employeeModalTitle">
+  <div class="modal-box">
+    <div class="modal-head"><div><h2 id="employeeModalTitle">Novo funcionário</h2><p id="employeeModalSubtitle">Informe os dados do funcionário.</p></div><button class="modal-close" type="button" onclick="closeModal('employeeModal')">×</button></div>
+    <form id="employeeForm" class="modal-form" method="post" action="{{url_for('new_employee')}}">
+      <label>Nome completo *<input name="full_name" id="employeeName" required></label>
+      <div class="form-row"><label>Função *<input name="function" id="employeeFunction" placeholder="Ex.: Limpeza, Recepção, Administração..." required></label><label class="check-field"><input type="checkbox" name="active" id="employeeActive" checked> Funcionário ativo</label></div>
+      <div class="form-row"><label>Data de nascimento<input type="date" name="birth_date" id="employeeBirthDate"></label><label>Salário<input name="salary" id="employeeSalary" value="0,00"></label></div>
+      <label>Endereço<input name="address" id="employeeAddress" placeholder="Rua, número, bairro..."></label>
+      <div class="form-row"><label>Telefone<input name="phone" id="employeePhone" placeholder="(00) 00000-0000"></label><label>WhatsApp<input name="whatsapp" id="employeeWhatsapp" placeholder="(00) 00000-0000"></label></div>
+      <label>Observações<textarea name="notes" id="employeeNotes" rows="3" placeholder="Opcional"></textarea></label>
+      <div class="form-section-title" id="employeeAccessSection">Acesso ao sistema</div>
+      <label class="check-field" id="employeeCreateAccessRow"><input type="checkbox" name="create_access" id="employeeCreateAccess" onchange="toggleEmployeeAccessFields()"> Criar conta de login para este funcionário</label>
+      <div id="employeeAccessFields" style="display:none">
+        <div class="form-row"><label>Usuário<input name="username" id="employeeUsername" autocomplete="off"></label><label>Senha<input name="password" id="employeePassword" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label></div>
+        <label>Cargo de acesso<select name="role" id="employeeRole"><option value="FUNCIONARIO">Funcionário</option><option value="ADMINISTRADOR">Administrador</option></select></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="btn" onclick="closeModal('employeeModal')">Cancelar</button><button class="btn primary" type="submit" id="employeeSubmit">Cadastrar funcionário</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="accessModal" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle">
+  <div class="modal-box">
+    <div class="modal-head"><div><h2 id="accessModalTitle">Criar acesso ao sistema</h2><p>Defina usuário, senha e cargo para este funcionário.</p></div><button class="modal-close" type="button" onclick="closeModal('accessModal')">×</button></div>
+    <form id="accessForm" class="modal-form" method="post" action="">
+      <label>Usuário<input name="username" id="accessUsername" required autocomplete="off"></label>
+      <label>Senha<input name="password" id="accessPassword" type="password" required autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>
+      <label>Cargo de acesso<select name="role" id="accessRole"><option value="FUNCIONARIO">Funcionário</option><option value="ADMINISTRADOR">Administrador</option></select></label>
+      <div class="modal-actions"><button type="button" class="btn" onclick="closeModal('accessModal')">Cancelar</button><button class="btn primary" type="submit">Criar acesso</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+function openModal(id){const el=document.getElementById(id); if(el){el.classList.add('show'); const first=el.querySelector('input,select,textarea'); if(first) setTimeout(()=>first.focus(),50);}}
+function closeModal(id){const el=document.getElementById(id); if(el) el.classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));});
+function toggleEmployeeAccessFields(){
+  const checked=document.getElementById('employeeCreateAccess').checked;
+  document.getElementById('employeeAccessFields').style.display=checked?'block':'none';
+}
+function newEmployeeModal(){
+  const f=document.getElementById('employeeForm');
+  f.action='{{url_for("new_employee")}}'; f.reset();
+  document.getElementById('employeeModalTitle').textContent='Novo funcionário';
+  document.getElementById('employeeModalSubtitle').textContent='Informe os dados do funcionário.';
+  document.getElementById('employeeSubmit').textContent='Cadastrar funcionário';
+  document.getElementById('employeeActive').checked=true;
+  document.getElementById('employeeAccessSection').style.display='';
+  document.getElementById('employeeCreateAccessRow').style.display='';
+  document.getElementById('employeeCreateAccess').disabled=false;
+  toggleEmployeeAccessFields();
+  openModal('employeeModal');
+}
+function editEmployee(btn){
+  const f=document.getElementById('employeeForm');
+  f.action='/employees/'+btn.dataset.id+'/edit';
+  document.getElementById('employeeModalTitle').textContent='Editar funcionário';
+  document.getElementById('employeeModalSubtitle').textContent='Atualize os dados do funcionário.';
+  document.getElementById('employeeSubmit').textContent='Salvar alterações';
+  document.getElementById('employeeName').value=btn.dataset.name;
+  document.getElementById('employeeFunction').value=btn.dataset.function;
+  document.getElementById('employeeBirthDate').value=btn.dataset.birthDate;
+  document.getElementById('employeeAddress').value=btn.dataset.address;
+  document.getElementById('employeeSalary').value=btn.dataset.salary;
+  document.getElementById('employeePhone').value=btn.dataset.phone;
+  document.getElementById('employeeWhatsapp').value=btn.dataset.whatsapp;
+  document.getElementById('employeeNotes').value=btn.dataset.notes;
+  document.getElementById('employeeActive').checked=btn.dataset.active==='1';
+  document.getElementById('employeeAccessSection').style.display='none';
+  document.getElementById('employeeCreateAccessRow').style.display='none';
+  document.getElementById('employeeCreateAccess').checked=false;
+  document.getElementById('employeeCreateAccess').disabled=true;
+  toggleEmployeeAccessFields();
+  openModal('employeeModal');
+}
+function openAccessModal(employeeId){
+  document.getElementById('accessForm').action='/employees/'+employeeId+'/access/grant';
+  document.getElementById('accessForm').reset();
+  openModal('accessModal');
+}
+</script>{% endblock %}

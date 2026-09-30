@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Unidades • {{ brand.name }}{% endblock %}
+{% block page_title %}Unidades{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Unidades</h1><p>Visualize rapidamente a situação de cada quarto e kitnet.</p></div>
+  <div class="quick">
+    <a class="btn" href="{{url_for('rooms')}}#mapa">Mapa das unidades</a>
+    <button class="btn primary" type="button" onclick="newRoomModal()">+ Nova unidade</button>
+  </div>
+</div>
+<div class="operation-summary">
+  <div class="summary-card"><span>Total</span><strong>{{rooms|length}}</strong><small>unidades encontradas</small></div>
+  <div class="summary-card info-card"><span>Ocupadas</span><strong>{{rooms|selectattr('status','equalto','OCUPADO')|list|length}}</strong><small>hospedadas agora</small></div>
+  <div class="summary-card success-card"><span>Disponíveis</span><strong>{{rooms|selectattr('status','equalto','DISPONÍVEL')|list|length}}</strong><small>prontas para hospedagem</small></div>
+  <div class="summary-card warning-card"><span>Reservadas</span><strong>{{rooms|selectattr('status','equalto','RESERVADO')|list|length}}</strong><small>próximas entradas</small></div>
+</div>
+<form id="roomsFilters" class="filters professional-filter" method="get">
+  <input id="roomsSearch" name="q" value="{{q}}" placeholder="🔎 Buscar número ou observação..." aria-label="Buscar unidade">
+  <select id="roomsStatus" name="status"><option value="">Todos os status</option>{% for s in ['DISPONÍVEL','OCUPADO','RESERVADO','LIMPEZA','MANUTENÇÃO','INDISPONÍVEL'] %}<option value="{{s}}" {{'selected' if status==s}}>{{s}}</option>{% endfor %}</select>
+  <select id="roomsBlock" name="block"><option value="">Todos os blocos</option>{% for b in ['A','B','C'] %}<option value="{{b}}" {{'selected' if block==b}}>Bloco {{b}}</option>{% endfor %}</select>
+  <button class="btn primary" type="submit">Filtrar</button>
+  <a class="btn" href="{{url_for('rooms')}}">Limpar filtros</a>
+</form>
+<div class="card table-card" id="mapa">
+  <div class="operation-head"><div><h3>Mapa das unidades</h3><p class="muted">{{rooms|length}} unidade(s) encontradas com os filtros atuais.</p></div></div>
+  <div class="room-grid large" style="padding:18px">
+    {% for block_name in ['A','B','C'] %}{% set block_rooms = rooms_by_block.get(block_name, []) %}
+      {% if block_rooms %}
+      <div class="room-block-title">Bloco {{block_name}}</div>
+      {% for r in block_rooms %}<div class="room {{r.status|lower|replace('í','i')|replace('ã','a')|replace('ç','c')|replace('ê','e')|replace('é','e')}}"><button class="room-edit-btn" type="button" onclick="editRoom(this)" data-id="{{r.id}}" data-number="{{r.number}}" data-type="{{r.room_type_id}}" data-active="{{'1' if r.active else '0'}}" data-daily="{{'1' if r.daily else '0'}}" data-notes="{{(r.notes or '')|e}}" data-status="{{r.status}}" aria-label="Editar unidade {{r.number}}">✎</button><b>{{r.number}}</b><small>{{types.get(r.room_type_id,'Unidade')}}</small><span>{{r.status.title()}}</span></div>{% endfor %}
+      {% endif %}
+    {% endfor %}
+    {% if not rooms %}<div class="empty" style="grid-column:1/-1">Nenhuma unidade encontrada com os filtros atuais.</div>{% endif %}
+  </div>
+</div>
+<div class="card table-card" id="valores" style="margin-top:18px">
+  <div class="operation-head"><div><h3>Valores por tipo de unidade</h3><p class="muted">Aluguel (hospedagem) e diária usados para preencher o valor ao lançar hospedagens e reservas.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Aluguel (hospedagem)</th><th>Diária</th><th>Ações</th></tr></thead><tbody>
+    {% for rt in room_types %}<tr><td><b>{{rt.name}}</b></td><td>R$ {{'%.2f'|format(rt.rent_value)|replace('.',',')}}</td><td>R$ {{'%.2f'|format(rt.daily_value)|replace('.',',')}}</td><td><button class="icon-btn" type="button" onclick="openModal('priceModal{{rt.id}}')">✎ Editar</button></td></tr>{% else %}<tr><td colspan="4" class="empty">Nenhum tipo de unidade cadastrado.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+{% for rt in room_types %}
+<div class="modal" id="priceModal{{rt.id}}"><div class="modal-box"><div class="modal-head"><div><h2>Valores — {{rt.name}}</h2><p>Aluguel e diária cobrados nesta unidade.</p></div><button class="modal-close" type="button" onclick="closeModal('priceModal{{rt.id}}')">×</button></div><form class="modal-form" method="post" action="{{url_for('room_type_pricing',rtid=rt.id)}}"><div class="form-row"><label>Aluguel (hospedagem)<input name="rent_value" value="{{'%.2f'|format(rt.rent_value)|replace('.',',')}}" required></label><label>Diária<input name="daily_value" value="{{'%.2f'|format(rt.daily_value)|replace('.',',')}}" required></label></div><div class="modal-actions"><button type="button" class="btn" onclick="closeModal('priceModal{{rt.id}}')">Cancelar</button><button class="btn primary" type="submit">Salvar valores</button></div></form></div></div>
+{% endfor %}
+<div class="modal" id="roomModal" role="dialog" aria-modal="true" aria-labelledby="roomModalTitle">
+  <div class="modal-box modal-box-lg">
+    <div class="modal-head"><div><h2 id="roomModalTitle">Cadastrar unidade</h2><p id="roomModalSubtitle">Informe os dados da unidade.</p></div><button class="modal-close" type="button" onclick="closeModal('roomModal')" aria-label="Fechar">×</button></div>
+    <form id="newRoomForm" class="modal-form" method="post" action="/rooms/new">
+      <div class="form-row room-identity-row">
+        <label>Bloco<select name="block" id="roomBlock" required><option value="">Selecione...</option><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></label>
+        <label>Número da unidade<input name="number" id="roomNumber" placeholder="101" inputmode="numeric" maxlength="10" required></label>
+      </div>
+      <div class="form-row room-status-row" id="roomStatusRow">
+        <label>Tipo<select name="room_type_id" id="roomType" required><option value="">Selecione...</option>{% for type_id,type_name in types.items() %}<option value="{{type_id}}">{{type_name}}</option>{% endfor %}</select></label>
+        <label id="roomStatusField">Status<select name="status" id="roomStatus"><option>DISPONÍVEL</option><option>OCUPADO</option><option>RESERVADO</option><option>LIMPEZA</option><option>MANUTENÇÃO</option><option>INDISPONÍVEL</option></select></label>
+        <label class="check-field"><input type="checkbox" name="active" id="roomActive" checked> Unidade ativa</label>
+        <label class="check-field"><input type="checkbox" name="daily" id="roomDaily"> Aceita diária</label>
+      </div>
+      <small class="field-help" id="roomStatusNote" style="display:none">O status desta unidade é atualizado automaticamente pelas hospedagens, reservas e operações — não é editável por aqui.</small>
+      <label>Observações<textarea name="notes" id="roomNotes" rows="3" placeholder="Opcional"></textarea></label>
+      <div class="modal-actions"><button type="button" class="btn" onclick="closeModal('roomModal')">Cancelar</button><button class="btn primary" type="submit" id="roomSubmit">Cadastrar unidade</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openModal(id){const el=document.getElementById(id); if(el){el.classList.add('show'); const first=el.querySelector('input,select,textarea'); if(first) setTimeout(()=>first.focus(),50);}}
+function closeModal(id){const el=document.getElementById(id); if(el) el.classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));});
+function newRoomModal(){
+  const f=document.getElementById('newRoomForm');
+  f.action='/rooms/new'; f.reset();
+  document.getElementById('roomModalTitle').textContent='Cadastrar unidade';
+  document.getElementById('roomModalSubtitle').textContent='Informe os dados da unidade.';
+  document.getElementById('roomSubmit').textContent='Cadastrar unidade';
+  document.getElementById('roomActive').checked=true;
+  document.getElementById('roomStatus').value='DISPONÍVEL';
+  document.querySelectorAll('#roomStatus option').forEach(opt=>opt.hidden=false);
+  document.getElementById('roomStatusField').style.display='';
+  document.getElementById('roomStatusRow').classList.remove('status-hidden');
+  document.getElementById('roomStatusNote').style.display='none';
+  openModal('roomModal');
+}
+function editRoom(btn){
+  const f=document.getElementById('newRoomForm');
+  f.action='/rooms/'+btn.dataset.id+'/edit';
+  document.getElementById('roomModalTitle').textContent='Editar unidade';
+  document.getElementById('roomModalSubtitle').textContent='Atualize os dados da unidade '+btn.dataset.number+'.';
+  document.getElementById('roomSubmit').textContent='Salvar alterações';
+  document.getElementById('roomBlock').value=btn.dataset.number[0];
+  document.getElementById('roomNumber').value=btn.dataset.number;
+  document.getElementById('roomType').value=btn.dataset.type;
+  document.getElementById('roomActive').checked=btn.dataset.active==='1';
+  document.getElementById('roomDaily').checked=btn.dataset.daily==='1';
+  document.getElementById('roomNotes').value=btn.dataset.notes;
+  document.getElementById('roomStatus').value=btn.dataset.status;
+  const canToggleStatus=btn.dataset.status==='DISPONÍVEL'||btn.dataset.status==='INDISPONÍVEL';
+  document.querySelectorAll('#roomStatus option').forEach(opt=>{opt.hidden=canToggleStatus&&opt.value!=='DISPONÍVEL'&&opt.value!=='INDISPONÍVEL';});
+  document.getElementById('roomStatusField').style.display=canToggleStatus?'':'none';
+  document.getElementById('roomStatusRow').classList.toggle('status-hidden',!canToggleStatus);
+  document.getElementById('roomStatusNote').style.display=canToggleStatus?'none':'block';
+  openModal('roomModal');
+}
+document.addEventListener('DOMContentLoaded',function(){
+  const form=document.getElementById('newRoomForm'), block=document.getElementById('roomBlock'), number=document.getElementById('roomNumber');
+  if(form) form.addEventListener('submit',function(e){
+    const value=(number.value||'').trim().toUpperCase().replace(/\s/g,'');
+    if(!/^\d+$/.test(value) && !/^[ABC]\d+$/.test(value)){e.preventDefault(); alert('Informe apenas números, como 101.'); number.focus(); return;}
+    if(/^[ABC]/.test(value) && value[0]!==block.value){e.preventDefault(); alert('O bloco selecionado não corresponde ao número informado.'); number.focus();}
+  });
+  const filter=document.getElementById('roomsFilters');
+  if(filter){
+    const submit=()=>filter.requestSubmit?filter.requestSubmit():filter.submit();
+    let timer;
+    document.getElementById('roomsSearch')?.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(submit,300);});
+    document.getElementById('roomsStatus')?.addEventListener('change',submit);
+    document.getElementById('roomsBlock')?.addEventListener('change',submit);
+  }
+});
+</script>
+{% endblock %}
