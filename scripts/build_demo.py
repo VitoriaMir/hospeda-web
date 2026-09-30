@@ -26,10 +26,10 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / '_site'
 DEMO_ASSETS = ROOT / 'demo'
 
-# Base temporária e limpa: a demo nunca usa conpec.db nem a marca local.
-tmp_dir = tempfile.mkdtemp(prefix='conpec-demo-')
-os.environ['CONPEC_DATABASE_URL'] = f"sqlite:///{Path(tmp_dir, 'demo.db').as_posix()}"
-os.environ.setdefault('CONPEC_SECRET_KEY', secrets.token_hex(32))
+# Base temporária e limpa: a demo nunca usa hospeda.db nem a marca local.
+tmp_dir = tempfile.mkdtemp(prefix='hospeda-demo-')
+os.environ['HOSPEDA_DATABASE_URL'] = f"sqlite:///{Path(tmp_dir, 'demo.db').as_posix()}"
+os.environ.setdefault('HOSPEDA_SECRET_KEY', secrets.token_hex(32))
 sys.path.insert(0, str(ROOT))
 
 import app.core.branding as branding  # noqa: E402

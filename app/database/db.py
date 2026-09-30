@@ -5,9 +5,9 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy import text
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-DB_PATH = BASE_DIR / "conpec.db"
-# CONPEC_DATABASE_URL permite apontar para outra base SQLite (ex.: build da demo).
-DATABASE_URL = os.environ.get("CONPEC_DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
+DB_PATH = BASE_DIR / "hospeda.db"
+# HOSPEDA_DATABASE_URL permite apontar para outra base SQLite (ex.: build da demo).
+DATABASE_URL = os.environ.get("HOSPEDA_DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
 
 engine = create_engine(
     DATABASE_URL,

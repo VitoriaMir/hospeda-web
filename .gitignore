@@ -3,7 +3,7 @@
 __pycache__/
 *.pyc
 .secret_key
-conpec.db
+hospeda.db
 
 # Configuração local do Claude Code (não é parte do projeto)
 .claude/

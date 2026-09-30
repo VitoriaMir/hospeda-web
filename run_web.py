@@ -14,10 +14,10 @@ from app.core.branding import load_brand
 from app.services.bootstrap_service import bootstrap, seed_demo_occupancy
 
 def load_secret_key():
-    """Usa CONPEC_SECRET_KEY se definida; caso contrário, gera e persiste
+    """Usa HOSPEDA_SECRET_KEY se definida; caso contrário, gera e persiste
     uma chave local em .secret_key para manter as sessões válidas entre
     reinícios sem depender de uma chave fixa no código-fonte."""
-    env_key = os.environ.get('CONPEC_SECRET_KEY')
+    env_key = os.environ.get('HOSPEDA_SECRET_KEY')
     if env_key:
         return env_key
     key_file = Path(__file__).resolve().parent / '.secret_key'

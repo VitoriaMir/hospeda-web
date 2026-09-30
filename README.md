@@ -57,7 +57,7 @@ python run_web.py
 
 Abra http://127.0.0.1:5000 e entre com `admin` / `admin123` (o sistema pede a troca de senha no primeiro acesso).
 
-Na primeira execução é criada a base `conpec.db` com uma massa de dados fictícia (nomes, CPFs e contatos de teste) em todos os módulos.
+Na primeira execução é criada a base `hospeda.db` com uma massa de dados fictícia (nomes, CPFs e contatos de teste) em todos os módulos.
 
 Para gerar a demo estática localmente:
 
@@ -85,8 +85,8 @@ Outras variáveis:
 
 | Variável | Uso |
 |---|---|
-| `CONPEC_SECRET_KEY` | Chave de sessão do Flask. Sem ela, uma chave é gerada e salva em `.secret_key` |
-| `CONPEC_DATABASE_URL` | Base de dados alternativa (padrão: `sqlite:///conpec.db`) |
+| `HOSPEDA_SECRET_KEY` | Chave de sessão do Flask. Sem ela, uma chave é gerada e salva em `.secret_key` |
+| `HOSPEDA_DATABASE_URL` | Base de dados alternativa (padrão: `sqlite:///hospeda.db`) |
 
 ## Estrutura
 
