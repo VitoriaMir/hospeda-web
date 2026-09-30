@@ -5,7 +5,7 @@
   var ROUTES = window.DEMO_ROUTES || {};
   var meta = document.querySelector('meta[name="demo-path"]');
   var here = meta ? meta.content.split('?')[0] : '';
-  var REPO_URL = 'https://github.com/VitoriaMir/conpec-web';
+  var REPO_URL = 'https://github.com/VitoriaMir/hospeda-web';
 
   // Página acessada com parâmetros (ex.: aba de despesas): usa a variante pré-gerada.
   if (location.search) {

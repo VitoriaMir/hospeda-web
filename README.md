@@ -6,7 +6,7 @@
 
 Sistema web para casas de hospedagem, pensionatos e residências: unidades, hóspedes, reservas, financeiro, limpeza e manutenção em um só painel.
 
-**[▶ Abrir a demonstração interativa](https://vitoriamir.github.io/conpec-web/)**
+**[▶ Abrir a demonstração interativa](https://vitoriamir.github.io/hospeda-web/)**
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3-000000?logo=flask&logoColor=white)
